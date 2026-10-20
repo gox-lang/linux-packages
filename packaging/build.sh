@@ -56,6 +56,10 @@ URL: https://gox-lang.dev
 AutoReqProv: no
 Requires: glibc >= $glibc
 Requires: ca-certificates, gcc, glibc-devel, binutils, git, curl, xz
+%ifarch aarch64
+# Go selects gold when linking Linux ARM64 plugins. Fedora ships it separately.
+Requires: binutils-gold
+%endif
 %description
 Official GOX release binary with package-managed updates.
 GOX provisions its Go and frontend toolchains when needed.

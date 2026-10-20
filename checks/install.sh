@@ -22,6 +22,12 @@ case "$format" in
     *) exit 1 ;;
 esac
 [[ $(stat -c '%U:%G:%a' /usr/lib/gox/gox) == root:root:755 ]]
+if [[ $arch == arm64 ]]; then
+    # Exercise the linker selected by Go before downloading the Go toolchain.
+    printf 'int gox_link_check(void) { return 0; }\n' | \
+        gcc -x c -shared -fPIC -fuse-ld=gold -o /tmp/gox-link-check.so -
+    rm /tmp/gox-link-check.so
+fi
 useradd -m -s /bin/bash tester
 su - tester -c "bash /checks/project.sh $version"
 # Upgrade a package revision, not a fabricated upstream release. The executable
