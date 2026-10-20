@@ -4,6 +4,7 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -65,5 +66,12 @@ jobs:
       - run: docker build -t gox-linux-packager -f packaging/Dockerfile .
       - name: Test signed repository snapshots with a disposable key
         run: |
-          docker run --rm --entrypoint bash -v "$PWD:/src:ro" \
-            gox-linux-packager /src/checks/signatures.sh /src/dist
+          mkdir -p fixtures
+          docker run --rm --entrypoint bash -v "$PWD:/src:ro" -v "$PWD/fixtures:/fixtures" \
+            gox-linux-packager /src/checks/signatures.sh /src/dist /fixtures/repository
+      - name: Install through signed APT and DNF repositories
+        run: |
+          docker run --rm -v "$PWD/fixtures/repository:/repository:ro" -v "$PWD/checks:/checks:ro" \
+            debian:12 bash /checks/repository-client.sh deb
+          docker run --rm -v "$PWD/fixtures/repository:/repository:ro" -v "$PWD/checks:/checks:ro" \
+            fedora:43 bash /checks/repository-client.sh rpm

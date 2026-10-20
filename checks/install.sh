@@ -8,16 +8,16 @@ case "$format" in
     deb)
         export DEBIAN_FRONTEND=noninteractive
         apt-get update
-        apt-get install -y "/packages/gox_${version}-1_${arch}.deb"
-        apt-get install -y --reinstall "/packages/gox_${version}-1_${arch}.deb"
-        apt-get install -y "/packages/gox_${version}-2_${arch}.deb"
-        [[ $(dpkg-query -W -f='${Version}' gox) == "$version-2" ]]
+        apt-get install -y "/packages/gox-server_${version}-1_${arch}.deb"
+        apt-get install -y --reinstall "/packages/gox-server_${version}-1_${arch}.deb"
+        apt-get install -y "/packages/gox-server_${version}-2_${arch}.deb"
+        [[ $(dpkg-query -W -f='${Version}' gox-server) == "$version-2" ]]
         ;;
     rpm)
-        dnf install -y "/packages/gox-${version}-1.${rpm_arch}.rpm"
-        dnf reinstall -y "/packages/gox-${version}-1.${rpm_arch}.rpm"
-        dnf install -y "/packages/gox-${version}-2.${rpm_arch}.rpm"
-        [[ $(rpm -q --qf '%{VERSION}-%{RELEASE}' gox) == "$version-2" ]]
+        dnf install -y "/packages/gox-server-${version}-1.${rpm_arch}.rpm"
+        dnf reinstall -y "/packages/gox-server-${version}-1.${rpm_arch}.rpm"
+        dnf install -y "/packages/gox-server-${version}-2.${rpm_arch}.rpm"
+        [[ $(rpm -q --qf '%{VERSION}-%{RELEASE}' gox-server) == "$version-2" ]]
         ;;
     *) exit 1 ;;
 esac
@@ -33,8 +33,8 @@ su - tester -c "bash /checks/project.sh $version"
 # Upgrade a package revision, not a fabricated upstream release. The executable
 # should remain the exact same published binary throughout this packaging test.
 case "$format" in
-    deb) apt-get remove -y gox; apt-get purge -y gox ;;
-    rpm) dnf remove -y gox ;;
+    deb) apt-get remove -y gox-server; apt-get purge -y gox-server ;;
+    rpm) dnf remove -y gox-server ;;
 esac
 [[ ! -e /usr/bin/gox && ! -e /usr/lib/gox/gox ]]
 [[ -d /home/tester/smoke-project ]]

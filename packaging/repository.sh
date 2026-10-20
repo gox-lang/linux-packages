@@ -16,12 +16,12 @@ rpms=("$packages"/*.rpm)
 ((${#debs[@]} && ${#rpms[@]})) || { echo 'Both DEB and RPM packages are required' >&2; exit 1; }
 mkdir -p "$output/apt/pool/main"
 for package in "${debs[@]}"; do
-    [[ $(dpkg-deb -f "$package" Package) == gox ]]
+    [[ $(dpkg-deb -f "$package" Package) == gox-server ]]
     case $(dpkg-deb -f "$package" Architecture) in amd64|arm64) ;; *) exit 1;; esac
     cp "$package" "$output/apt/pool/main/"
 done
 for package in "${rpms[@]}"; do
-    [[ $(rpm -qp --qf '%{NAME}' "$package") == gox ]]
+    [[ $(rpm -qp --qf '%{NAME}' "$package") == gox-server ]]
     arch=$(rpm -qp --qf '%{ARCH}' "$package")
     case "$arch" in x86_64|aarch64) ;; *) exit 1;; esac
     mkdir -p "$output/rpm/$arch/Packages"

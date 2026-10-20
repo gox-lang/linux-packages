@@ -1,0 +1,102 @@
+name: Publish Linux repositories
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: linux-repository-publication
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+  sign:
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: package-signing
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unsigned-packages-*
+          path: candidates
+          merge-multiple: true
+      - name: Collect approved packages, preserving published versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p approved
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[].tag_name' > released-tags.txt
+          while read -r version revision extra; do
+            [[ -z "$version" || "$version" == \#* ]] && continue
+            [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && "$revision" =~ ^[1-9][0-9]*$ && -z "$extra" ]]
+            tag="v$version-$revision"
+            if grep -Fxq "$tag" released-tags.txt; then
+              gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern '*.deb' --pattern '*.rpm' --pattern SHA256SUMS --dir "retained/$tag"
+              (cd "retained/$tag" && sha256sum -c SHA256SUMS)
+              cp "retained/$tag/"*.deb "retained/$tag/"*.rpm approved/
+            else
+              for arch in amd64 arm64; do cp "candidates/gox-server_${version}-${revision}_${arch}.deb" approved/; done
+              for arch in x86_64 aarch64; do cp "candidates/gox-server-${version}-${revision}.${arch}.rpm" approved/; done
+            fi
+          done < packaging/releases.txt
+      - run: docker build -t gox-linux-packager -f packaging/Dockerfile .
+      - name: Sign complete repository snapshot
+        env:
+          GOX_SIGNING_KEY: ${{ secrets.GOX_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          export GOX_SIGNING_FINGERPRINT=$(cat packaging/signing-fingerprint.txt)
+          umask 077
+          keydir=$(mktemp -d)
+          trap 'rm -rf "$keydir"' EXIT
+          printf '%s' "$GOX_SIGNING_KEY" > "$keydir/signing.asc"
+          mkdir -p output
+          docker run --rm --entrypoint bash -e GOX_SIGNING_FINGERPRINT \
+            -v "$keydir:/keys:ro" -v "$PWD:/src:ro" -v "$PWD/output:/output" \
+            gox-linux-packager -c '
+              set -euo pipefail
+              export GNUPGHOME=$(mktemp -d)
+              trap '\''rm -rf "$GNUPGHOME"'\'' EXIT
+              gpg --batch --import /keys/signing.asc
+              bash /src/packaging/repository.sh /src/approved /output/site
+              gpgv --keyring /output/site/gox-archive-keyring.gpg /output/site/apt/dists/stable/InRelease
+            '
+      - name: Verify signed packages with real clients
+        run: |
+          docker run --rm -v "$PWD/output/site:/repository:ro" -v "$PWD/checks:/checks:ro" debian:12 bash /checks/repository-client.sh deb
+          docker run --rm -v "$PWD/output/site:/repository:ro" -v "$PWD/checks:/checks:ro" fedora:43 bash /checks/repository-client.sh rpm
+      - name: Archive immutable packages in GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          while read -r version revision extra; do
+            [[ -z "$version" || "$version" == \#* ]] && continue
+            tag="v$version-$revision"
+            grep -Fxq "$tag" released-tags.txt && continue
+            mkdir -p "release/$tag"
+            cp output/site/apt/pool/main/gox-server_"$version-$revision"_*.deb "release/$tag/"
+            cp output/site/rpm/*/Packages/gox-server-"$version-$revision".*.rpm "release/$tag/"
+            (cd "release/$tag" && sha256sum *.deb *.rpm > SHA256SUMS)
+            gh release create "$tag" "release/$tag/"* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "GOX $version — Linux packages revision $revision" \
+              --notes 'Official GOX binaries packaged for APT and DNF. RPM packages are signed. Use the signed repositories for package-manager installation and updates.'
+          done < packaging/releases.txt
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: output/site
+  deploy:
+    needs: sign
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

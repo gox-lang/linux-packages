@@ -23,6 +23,11 @@ rpm --dbpath "$work/rpmdb" --import "$work/site/gox-signing-key.asc"
 for package in "$work/site"/rpm/*/Packages/*.rpm; do
     rpmkeys --dbpath "$work/rpmdb" --checksig "$package" | grep -F 'signatures OK'
 done
+# Optional disposable fixture for real APT/DNF client tests.
+if [[ -n ${2:-} ]]; then
+    [[ ! -e $2 ]]
+    cp -a "$work/site" "$2"
+fi
 # Corrupt signed metadata and require verification to fail.
 sed -i 's/Origin: GOX/Origin: altered/' "$work/site/apt/dists/stable/InRelease"
 if gpgv --keyring "$work/site/gox-archive-keyring.gpg" "$work/site/apt/dists/stable/InRelease"; then

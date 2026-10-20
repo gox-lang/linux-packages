@@ -30,7 +30,8 @@ install -m 755 "$root/packaging/gox.sh" "$stage/usr/bin/gox"
 install -m 644 "$work/release/LICENSE" "$stage/usr/share/doc/gox/copyright"
 mkdir -p "$stage/DEBIAN"
 cat > "$stage/DEBIAN/control" <<CONTROL
-Package: gox
+Package: gox-server
+Conflicts: gox
 Version: $version-$revision
 Architecture: $arch
 Maintainer: GOX Maintainers
@@ -43,11 +44,12 @@ Description: Web framework and development tools for Go
  GOX provisions its Go and frontend toolchains when needed.
 CONTROL
 (cd "$stage" && find usr -type f -print0 | sort -z | xargs -0 md5sum > DEBIAN/md5sums)
-dpkg-deb --root-owner-group -Zxz --build "$stage" "$output/gox_${version}-${revision}_${arch}.deb"
+dpkg-deb --root-owner-group -Zxz --build "$stage" "$output/gox-server_${version}-${revision}_${arch}.deb"
 rm -r "$stage/DEBIAN"
 mkdir -p "$work/rpm"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 cat > "$work/rpm/SPECS/gox.spec" <<SPEC
-Name: gox
+Name: gox-server
+Conflicts: gox
 Version: $version
 Release: $revision
 Summary: Web framework and development tools for Go
@@ -79,14 +81,14 @@ SPEC
 rpmbuild -bb --target "$rpm_arch" --define "_topdir $work/rpm" \
     --define '__os_install_post %{nil}' --define '_build_id_links none' \
     "$work/rpm/SPECS/gox.spec"
-cp "$work/rpm/RPMS/$rpm_arch/gox-${version}-${revision}.${rpm_arch}.rpm" "$output/"
+cp "$work/rpm/RPMS/$rpm_arch/gox-server-${version}-${revision}.${rpm_arch}.rpm" "$output/"
 # Verify that packaging did not modify the release executable.
-dpkg-deb -x "$output/gox_${version}-${revision}_${arch}.deb" "$work/deb-check"
+dpkg-deb -x "$output/gox-server_${version}-${revision}_${arch}.deb" "$work/deb-check"
 mkdir "$work/rpm-check"
-rpm2cpio "$output/gox-${version}-${revision}.${rpm_arch}.rpm" | \
+rpm2cpio "$output/gox-server-${version}-${revision}.${rpm_arch}.rpm" | \
     (cd "$work/rpm-check" && cpio --quiet -idm)
 cmp "$work/release/gox" "$work/deb-check/usr/lib/gox/gox"
 cmp "$work/release/gox" "$work/rpm-check/usr/lib/gox/gox"
-(cd "$output" && sha256sum "gox_${version}-${revision}_${arch}.deb" \
-    "gox-${version}-${revision}.${rpm_arch}.rpm" > "checksums-${arch}-${revision}.sha256")
+(cd "$output" && sha256sum "gox-server_${version}-${revision}_${arch}.deb" \
+    "gox-server-${version}-${revision}.${rpm_arch}.rpm" > "checksums-${arch}-${revision}.sha256")
 printf 'Built GOX %s-%s for %s (GLIBC >= %s)\n' "$version" "$revision" "$arch" "$glibc"
