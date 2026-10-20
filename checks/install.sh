@@ -33,7 +33,7 @@ su - tester -c "bash /checks/project.sh $version"
 # Upgrade a package revision, not a fabricated upstream release. The executable
 # should remain the exact same published binary throughout this packaging test.
 case "$format" in
-    deb) apt-get remove -y gox-server; apt-get purge -y gox-server ;;
+    deb) apt-get purge -y gox-server ;;
     rpm) dnf remove -y gox-server ;;
 esac
 [[ ! -e /usr/bin/gox && ! -e /usr/lib/gox/gox ]]
