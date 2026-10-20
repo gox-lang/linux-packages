@@ -1,0 +1,16 @@
+/dist/
+/work/
+*.deb
+*.rpm
+*.tar.gz
+*.log
+*.key
+*.asc
+.env
+.env.*
+AGENTS.md
+.codex/
+.agents/
+.vscode/
+.idea/
+.DS_Store
