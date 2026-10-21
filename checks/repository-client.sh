@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Validate either a mounted signed snapshot or the anonymous public repository.
 set -euo pipefail
-base="${GOX_REPOSITORY_URL:-file:/repository}"
+base="${GOX_REPOSITORY_URL:-file:///repository}"
 expected="${2:-}"
 case "${1:?Supply deb or rpm}" in
   deb)
-    if [[ "$base" == file:/repository ]]; then
+    if [[ "$base" == file:///repository ]]; then
       install -m 644 /repository/gox-archive-keyring.gpg /usr/share/keyrings/gox.gpg
     else
       apt-get update
@@ -19,7 +19,7 @@ case "${1:?Supply deb or rpm}" in
     DEBIAN_FRONTEND=noninteractive apt-get install -y gox-server
     ;;
   rpm)
-    if [[ "$base" != file:/repository ]]; then
+    if [[ "$base" != file:///repository ]]; then
       dnf install -y ca-certificates curl-minimal gnupg2
       curl --fail --retry 5 --retry-all-errors "$base/gox-signing-key.asc" -o /tmp/gox-signing-key.asc
       actual=$(gpg --show-keys --with-colons /tmp/gox-signing-key.asc | awk -F: '$1=="fpr"{print $10;exit}')
