@@ -5,7 +5,7 @@ Downloads come exclusively from [GOX Server GitHub Releases](https://github.com/
 The shared downloader verifies SHA-256 before packaging. GOX is never rebuilt or
 stripped; no executables or generated packages are committed to this repository.
 
-The signed public repositories are not published yet. The intended addresses are
+The signed public repositories are available at
 `https://packages.gox-lang.dev/apt` and `https://packages.gox-lang.dev/rpm`.
 
 ## Build packages
@@ -58,20 +58,9 @@ docker run --rm -v "$PWD/dist:/packages:ro" -v "$PWD/checks:/checks:ro" \
   fedora:43 bash /checks/install.sh rpm 0.1.3 amd64
 ```
 
-These are unsigned development artifacts. Public distribution requires signed APT
-metadata and signed RPM packages/metadata, a protected publication workflow and
-anonymous end-to-end installation tests from the public URL. Test revisions must
-not be published as production updates.
-
-## Publication milestones
-
-1. Pass packaging and runtime tests on all supported architectures/distributions.
-2. Configure the GitHub repository and a protected signing environment.
-3. Prepare signed APT/RPM indexes, retaining older versions and publishing packages
-   before indexes that reference them. Store the signing key only in protected
-   secrets, with an independent secure backup; never commit it.
-4. Connect the package hostname, verify signatures and tamper rejection from clean
-   clients, then document installation on the GOX website.
+Local build outputs are unsigned development artifacts. The publication workflow
+signs APT metadata and RPM packages/metadata, validates installation, then verifies
+anonymous installation from the public URL. Test revision 2 is never published.
 
 ## Project
 
@@ -96,8 +85,7 @@ indexes and can be hosted as static files on GitHub Pages.
 [checks/signatures.sh](checks/signatures.sh) tests snapshot creation with a temporary,
 throwaway key, checks signatures, and requires altered metadata to fail verification.
 It does not create or configure a production signing key. CI never publishes the
-test snapshot. CI also exercises signed APT/DNF installation. Production DNS and anonymous
-HTTPS installation checks remain required before announcing availability.
+test snapshot. CI also exercises signed APT/DNF installation. The publication workflow also verifies anonymous HTTPS installation after deployment.
 
 ## Publishing
 
@@ -105,7 +93,8 @@ The package is named **`gox-server`** to avoid Debian's unrelated `gox` package.
 The installed command remains **`gox`**. The packages conflict explicitly with that
 other package because both own the same command path.
 
-Run **Publish Linux repositories** manually from `main`. It runs the full native
+The server distribution workflow invokes **Publish Linux repositories** from `main`
+with the new stable version. It runs the full native
 CI suite, downloads only its revision-1 artifacts, signs a complete snapshot,
 tests APT and DNF installation, archives new packages in GitHub Releases and then
 deploys the snapshot with GitHub Pages. Publication is serialized. Failed build,
@@ -126,9 +115,12 @@ enforce HTTPS once GitHub provisions the certificate.
 [packaging/releases.txt](packaging/releases.txt) lists approved versions and package
 revisions. Retain existing entries. Previously published packages are downloaded
 from this repository's GitHub Releases and their checksums verified; they are not
-rebuilt or overwritten. For a new release, update the native CI version/revisions
-and the approved list together. Never publish revision 2 from the upgrade smoke
+rebuilt or overwritten. For a new release, the workflow passes the version into native CI and adds
+the approved revision-1 entry automatically after public verification. Never publish revision 2 from the upgrade smoke
 test accidentally. Signing-key rotation requires a separate reviewed migration.
 
-Only announce installation after anonymous HTTPS installation has passed on the
-public hostname. Until then the website should keep this method marked pending.
+The signed repositories are public. New releases are only reported as successful
+after anonymous HTTPS installation passes on the public hostname.
+To retry, dispatch the publication workflow with a version, or leave it empty to
+resolve the latest stable server release. Existing signing secrets are reused;
+no new signing key or manual version edit is needed.

@@ -5,6 +5,10 @@ on:
   pull_request:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      version:
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -21,6 +25,13 @@ jobs:
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
+      - name: Select version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          version="${REQUESTED_VERSION:-$(awk '!/^#/ && NF {v=$1} END {print v}' packaging/releases.txt)}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "GOX_PACKAGE_VERSION=$version" >> "$GITHUB_ENV"
       - name: Prepare packaging tools
         run: docker build -t gox-linux-packager -f packaging/Dockerfile .
       - name: Package the official release
@@ -30,20 +41,20 @@ jobs:
             docker run --rm --user "$(id -u):$(id -g)" \
               -v "$PWD:/src:ro" -v "$PWD/dist:/out" \
               -e GOX_PACKAGE_OUTPUT=/out \
-              gox-linux-packager 0.1.3 '${{ matrix.arch }}' "$revision"
+              gox-linux-packager "$GOX_PACKAGE_VERSION" '${{ matrix.arch }}' "$revision"
           done
       - name: Test Debian
         run: |
           docker run --rm -v "$PWD/dist:/packages:ro" -v "$PWD/checks:/checks:ro" \
-            debian:12 bash /checks/install.sh deb 0.1.3 '${{ matrix.arch }}'
+            debian:12 bash /checks/install.sh deb "$GOX_PACKAGE_VERSION" '${{ matrix.arch }}'
       - name: Test Ubuntu
         run: |
           docker run --rm -v "$PWD/dist:/packages:ro" -v "$PWD/checks:/checks:ro" \
-            ubuntu:24.04 bash /checks/install.sh deb 0.1.3 '${{ matrix.arch }}'
+            ubuntu:24.04 bash /checks/install.sh deb "$GOX_PACKAGE_VERSION" '${{ matrix.arch }}'
       - name: Test Fedora
         run: |
           docker run --rm -v "$PWD/dist:/packages:ro" -v "$PWD/checks:/checks:ro" \
-            fedora:43 bash /checks/install.sh rpm 0.1.3 '${{ matrix.arch }}'
+            fedora:43 bash /checks/install.sh rpm "$GOX_PACKAGE_VERSION" '${{ matrix.arch }}'
       - uses: actions/upload-artifact@v4
         with:
           name: unsigned-packages-${{ matrix.arch }}
